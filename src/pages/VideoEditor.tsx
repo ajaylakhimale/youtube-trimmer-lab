@@ -158,7 +158,7 @@ const VideoEditor = () => {
 
             {/* Center - Canvas */}
             <div className="lg:col-span-9 space-y-4">
-              <Card className="bg-[hsl(var(--editor-panel))] border-border p-6 flex justify-center items-center max-h-[calc(100vh-20rem)]">
+              <Card className="bg-[hsl(var(--editor-panel))] border-border p-6 pt-12 flex justify-center items-center max-h-[calc(100vh-20rem)]">
                 {loading ? (
                   <div className="flex items-center justify-center py-20">
                     <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />

@@ -199,97 +199,105 @@ const VideoCanvas = ({
   );
 
   return (
-    <div 
-      className="relative w-full max-w-md aspect-[9/16] max-h-[70vh] bg-black rounded-lg overflow-hidden"
-      style={{
-        transform: `scale(${panZoomSettings.zoom}) rotate(${panZoomSettings.rotation}deg) translate(${panZoomSettings.x}px, ${panZoomSettings.y}px)`,
-        transition: draggedLayer ? "none" : "transform 0.2s ease",
-      }}
-    >
-      {/* YouTube Video */}
-      <div 
-        ref={containerRef} 
-        className="absolute inset-0"
-        style={{
-          borderRadius: `${frameSettings.borderRadius}px`,
-          boxShadow: frameSettings.shadow !== "none" ? getShadowStyle(frameSettings.shadow) : "none",
-        }}
-      />
+    <div className="relative flex items-center justify-center">
+      {/* Export area label */}
+      <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs text-muted-foreground bg-[hsl(var(--editor-panel))] px-3 py-1 rounded-full border border-primary/30 z-10">
+        9:16 Reel Preview (Export Area)
+      </div>
       
-      {/* Frame Border */}
-      {frameSettings.borderWidth > 0 && (
-        <div
-          className="absolute inset-0 pointer-events-none"
+      {/* Reel-sized container - everything inside will be exported */}
+      <div 
+        className="relative w-full max-w-md aspect-[9/16] max-h-[70vh] bg-black rounded-lg overflow-hidden shadow-2xl border-2 border-primary/40"
+        style={{
+          transform: `scale(${panZoomSettings.zoom}) rotate(${panZoomSettings.rotation}deg) translate(${panZoomSettings.x}px, ${panZoomSettings.y}px)`,
+          transition: draggedLayer ? "none" : "transform 0.2s ease",
+        }}
+      >
+        {/* YouTube Video */}
+        <div 
+          ref={containerRef} 
+          className="absolute inset-0"
           style={{
-            border: `${frameSettings.borderWidth}px solid ${frameSettings.borderColor}`,
             borderRadius: `${frameSettings.borderRadius}px`,
+            boxShadow: frameSettings.shadow !== "none" ? getShadowStyle(frameSettings.shadow) : "none",
           }}
         />
-      )}
+      
+        {/* Frame Border */}
+        {frameSettings.borderWidth > 0 && (
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              border: `${frameSettings.borderWidth}px solid ${frameSettings.borderColor}`,
+              borderRadius: `${frameSettings.borderRadius}px`,
+            }}
+          />
+        )}
 
-      {/* Overlay Layers */}
-      {visibleOverlayLayers.map((layer) => (
-        <div
-          key={layer.id}
-          className={`absolute cursor-move ${selectedLayerId === layer.id ? "ring-2 ring-primary" : ""}`}
-          style={{
-            left: `${layer.x}%`,
-            top: `${layer.y}%`,
-            width: `${layer.width}%`,
-            height: `${layer.height}%`,
-            opacity: layer.opacity,
-            mixBlendMode: layer.blendMode as any,
-          }}
-          onMouseDown={(e) => handleLayerMouseDown(e, layer.id, layer.x, layer.y)}
-        >
-          <img src={layer.imageUrl} alt="overlay" className="w-full h-full object-cover" />
-          {selectedLayerId === layer.id && (
-            <button
-              className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground p-1 rounded-full hover:bg-destructive/90"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeOverlayLayer(layer.id);
-              }}
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-      ))}
+        {/* Overlay Layers */}
+        {visibleOverlayLayers.map((layer) => (
+          <div
+            key={layer.id}
+            className={`absolute cursor-move ${selectedLayerId === layer.id ? "ring-2 ring-primary" : ""}`}
+            style={{
+              left: `${layer.x}%`,
+              top: `${layer.y}%`,
+              width: `${layer.width}%`,
+              height: `${layer.height}%`,
+              opacity: layer.opacity,
+              mixBlendMode: layer.blendMode as any,
+            }}
+            onMouseDown={(e) => handleLayerMouseDown(e, layer.id, layer.x, layer.y)}
+          >
+            <img src={layer.imageUrl} alt="overlay" className="w-full h-full object-cover" />
+            {selectedLayerId === layer.id && (
+              <button
+                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground p-1 rounded-full hover:bg-destructive/90"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeOverlayLayer(layer.id);
+                }}
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        ))}
 
-      {/* Text Layers */}
-      {visibleTextLayers.map((layer) => (
-        <div
-          key={layer.id}
-          className={`absolute cursor-move select-none ${selectedLayerId === layer.id ? "ring-2 ring-primary" : ""}`}
-          style={{
-            left: `${layer.x}%`,
-            top: `${layer.y}%`,
-            fontSize: `${layer.fontSize}px`,
-            color: layer.color,
-            fontFamily: layer.fontFamily,
-            fontWeight: layer.bold ? "bold" : "normal",
-            fontStyle: layer.italic ? "italic" : "normal",
-            textDecoration: layer.underline ? "underline" : "none",
-            textShadow: "2px 2px 4px rgba(0,0,0,0.8)",
-            whiteSpace: "nowrap",
-          }}
-          onMouseDown={(e) => handleLayerMouseDown(e, layer.id, layer.x, layer.y)}
-        >
-          {layer.text}
-          {selectedLayerId === layer.id && (
-            <button
-              className="absolute -top-6 -right-2 bg-destructive text-destructive-foreground p-1 rounded-full hover:bg-destructive/90"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeTextLayer(layer.id);
-              }}
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-      ))}
+        {/* Text Layers */}
+        {visibleTextLayers.map((layer) => (
+          <div
+            key={layer.id}
+            className={`absolute cursor-move select-none ${selectedLayerId === layer.id ? "ring-2 ring-primary" : ""}`}
+            style={{
+              left: `${layer.x}%`,
+              top: `${layer.y}%`,
+              fontSize: `${layer.fontSize}px`,
+              color: layer.color,
+              fontFamily: layer.fontFamily,
+              fontWeight: layer.bold ? "bold" : "normal",
+              fontStyle: layer.italic ? "italic" : "normal",
+              textDecoration: layer.underline ? "underline" : "none",
+              textShadow: "2px 2px 4px rgba(0,0,0,0.8)",
+              whiteSpace: "nowrap",
+            }}
+            onMouseDown={(e) => handleLayerMouseDown(e, layer.id, layer.x, layer.y)}
+          >
+            {layer.text}
+            {selectedLayerId === layer.id && (
+              <button
+                className="absolute -top-6 -right-2 bg-destructive text-destructive-foreground p-1 rounded-full hover:bg-destructive/90"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeTextLayer(layer.id);
+                }}
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
