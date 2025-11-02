@@ -104,7 +104,7 @@ const VideoCanvas = ({
 
   if (!youtubeId) {
     return (
-      <div className="relative w-full aspect-[9/16] bg-[hsl(var(--editor-bg))] rounded-lg overflow-hidden flex items-center justify-center">
+      <div className="relative w-full max-w-md aspect-[9/16] max-h-[70vh] bg-[hsl(var(--editor-bg))] rounded-lg overflow-hidden flex items-center justify-center">
         <div className="text-center">
           <p className="text-muted-foreground text-lg">No video loaded</p>
           <p className="text-muted-foreground text-sm mt-2">Select a clip to start editing</p>
@@ -114,7 +114,7 @@ const VideoCanvas = ({
   }
 
   return (
-    <div className="relative w-full aspect-[9/16] bg-black rounded-lg overflow-hidden">
+    <div className="relative w-full max-w-md aspect-[9/16] max-h-[70vh] bg-black rounded-lg overflow-hidden">
       <div ref={containerRef} className="absolute inset-0" />
     </div>
   );
