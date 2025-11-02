@@ -72,6 +72,8 @@ serve(async (req) => {
 
     // Fetch video metadata from YouTube API (using oEmbed - no API key needed)
     let videoData;
+    let videoDuration = 0;
+    
     try {
       const oEmbedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${youtubeId}&format=json`;
       const response = await fetch(oEmbedUrl);
@@ -89,9 +91,33 @@ serve(async (req) => {
       );
     }
 
-    // For demo purposes, assume video is 5 minutes (300 seconds)
-    // In production, you'd use YouTube Data API v3 to get actual duration
-    const assumedDuration = 300;
+    // Fetch actual video duration from YouTube page metadata
+    try {
+      const pageResponse = await fetch(`https://www.youtube.com/watch?v=${youtubeId}`);
+      const pageHtml = await pageResponse.text();
+      
+      // Extract duration from ytInitialPlayerResponse JSON in page
+      const match = pageHtml.match(/"lengthSeconds":"(\d+)"/);
+      if (match && match[1]) {
+        videoDuration = parseInt(match[1], 10);
+        console.log('Extracted video duration:', videoDuration, 'seconds');
+      } else {
+        throw new Error('Could not extract duration from page');
+      }
+    } catch (error) {
+      console.error('Error fetching video duration:', error);
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch video duration from YouTube' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (videoDuration <= 0) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid video duration' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     // Create video record in database
     const { data: video, error: videoError } = await supabase
@@ -101,7 +127,7 @@ serve(async (req) => {
         youtube_url: youtubeUrl,
         youtube_id: youtubeId,
         title: videoData.title,
-        duration: assumedDuration,
+        duration: videoDuration,
         thumbnail_url: videoData.thumbnail_url || `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`,
         status: 'processing',
       })
@@ -118,14 +144,16 @@ serve(async (req) => {
 
     console.log('Created video record:', video.id);
 
-    // Generate 30-second clips metadata
+    // Generate 30-second clips metadata based on actual video duration
     const clipDuration = 30;
-    const numClips = Math.floor(assumedDuration / clipDuration);
+    const numClips = Math.floor(videoDuration / clipDuration);
+    
+    console.log(`Generating ${numClips} clips from ${videoDuration}s video`);
     
     const clips = [];
     for (let i = 0; i < numClips; i++) {
       const startTime = i * clipDuration;
-      const endTime = Math.min(startTime + clipDuration, assumedDuration);
+      const endTime = Math.min(startTime + clipDuration, videoDuration);
       
       clips.push({
         video_id: video.id,
