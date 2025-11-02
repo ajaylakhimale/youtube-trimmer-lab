@@ -14,7 +14,98 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clips: {
+        Row: {
+          clip_number: number
+          created_at: string | null
+          duration: number
+          end_time: number
+          file_path: string | null
+          id: string
+          start_time: number
+          status: string
+          thumbnail_url: string | null
+          updated_at: string | null
+          video_id: string
+        }
+        Insert: {
+          clip_number: number
+          created_at?: string | null
+          duration: number
+          end_time: number
+          file_path?: string | null
+          id?: string
+          start_time: number
+          status?: string
+          thumbnail_url?: string | null
+          updated_at?: string | null
+          video_id: string
+        }
+        Update: {
+          clip_number?: number
+          created_at?: string | null
+          duration?: number
+          end_time?: number
+          file_path?: string | null
+          id?: string
+          start_time?: number
+          status?: string
+          thumbnail_url?: string | null
+          updated_at?: string | null
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clips_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      videos: {
+        Row: {
+          created_at: string | null
+          duration: number | null
+          error_message: string | null
+          id: string
+          status: string
+          thumbnail_url: string | null
+          title: string | null
+          updated_at: string | null
+          user_id: string | null
+          youtube_id: string
+          youtube_url: string
+        }
+        Insert: {
+          created_at?: string | null
+          duration?: number | null
+          error_message?: string | null
+          id?: string
+          status?: string
+          thumbnail_url?: string | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          youtube_id: string
+          youtube_url: string
+        }
+        Update: {
+          created_at?: string | null
+          duration?: number | null
+          error_message?: string | null
+          id?: string
+          status?: string
+          thumbnail_url?: string | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          youtube_id?: string
+          youtube_url?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
