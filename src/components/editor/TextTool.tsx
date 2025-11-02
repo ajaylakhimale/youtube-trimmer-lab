@@ -4,24 +4,81 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import { useEditor } from "@/contexts/EditorContext";
+import { toast } from "sonner";
 
 const TextTool = () => {
-  const [fontSize, setFontSize] = useState([32]);
-  const [textColor, setTextColor] = useState("#36D1DC");
+  const { addTextLayer, selectedLayerId, textLayers, updateTextLayer } = useEditor();
+  const selectedLayer = textLayers.find((l) => l.id === selectedLayerId);
+  
+  const [text, setText] = useState(selectedLayer?.text || "Your Text Here");
+  const [fontSize, setFontSize] = useState([selectedLayer?.fontSize || 32]);
+  const [textColor, setTextColor] = useState(selectedLayer?.color || "#36D1DC");
+  const [fontFamily, setFontFamily] = useState(selectedLayer?.fontFamily || "Arial");
+  const [bold, setBold] = useState(selectedLayer?.bold || false);
+  const [italic, setItalic] = useState(selectedLayer?.italic || false);
+  const [underline, setUnderline] = useState(selectedLayer?.underline || false);
+
+  const handleAddText = () => {
+    addTextLayer({
+      text,
+      x: 50,
+      y: 50,
+      fontSize: fontSize[0],
+      color: textColor,
+      fontFamily,
+      bold,
+      italic,
+      underline,
+      startTime: 0,
+      endTime: 30,
+    });
+    toast.success("Text layer added! Drag to reposition.");
+  };
+
+  const handleUpdateSelected = () => {
+    if (!selectedLayerId) return;
+    updateTextLayer(selectedLayerId, {
+      text,
+      fontSize: fontSize[0],
+      color: textColor,
+      fontFamily,
+      bold,
+      italic,
+      underline,
+    });
+    toast.success("Text layer updated!");
+  };
 
   return (
     <div className="space-y-6">
       <div>
-        <Button className="w-full gradient-primary" size="sm">
+        <Button 
+          className="w-full gradient-primary" 
+          size="sm"
+          onClick={handleAddText}
+        >
           <Plus className="w-4 h-4 mr-2" />
           Add Text Layer
         </Button>
+        {selectedLayerId && (
+          <Button 
+            className="w-full mt-2" 
+            size="sm"
+            variant="outline"
+            onClick={handleUpdateSelected}
+          >
+            Update Selected
+          </Button>
+        )}
       </div>
 
       <div className="space-y-4">
         <div>
           <Label className="text-sm mb-2 block">Text Content</Label>
           <Input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
             placeholder="Enter your text..."
             className="bg-[hsl(var(--editor-bg))] border-border"
           />
@@ -60,7 +117,11 @@ const TextTool = () => {
 
         <div>
           <Label className="text-sm mb-2 block">Font Family</Label>
-          <select className="w-full px-3 py-2 rounded-md bg-[hsl(var(--editor-bg))] border border-border text-sm">
+          <select 
+            value={fontFamily}
+            onChange={(e) => setFontFamily(e.target.value)}
+            className="w-full px-3 py-2 rounded-md bg-[hsl(var(--editor-bg))] border border-border text-sm"
+          >
             <option>Arial</option>
             <option>Helvetica</option>
             <option>Times New Roman</option>
@@ -72,13 +133,28 @@ const TextTool = () => {
         </div>
 
         <div className="grid grid-cols-3 gap-2">
-          <Button variant="outline" size="sm" className="text-xs">
+          <Button 
+            variant={bold ? "default" : "outline"}
+            size="sm" 
+            className="text-xs"
+            onClick={() => setBold(!bold)}
+          >
             <b>B</b>
           </Button>
-          <Button variant="outline" size="sm" className="text-xs">
+          <Button 
+            variant={italic ? "default" : "outline"}
+            size="sm" 
+            className="text-xs"
+            onClick={() => setItalic(!italic)}
+          >
             <i>I</i>
           </Button>
-          <Button variant="outline" size="sm" className="text-xs">
+          <Button 
+            variant={underline ? "default" : "outline"}
+            size="sm" 
+            className="text-xs"
+            onClick={() => setUnderline(!underline)}
+          >
             <u>U</u>
           </Button>
         </div>

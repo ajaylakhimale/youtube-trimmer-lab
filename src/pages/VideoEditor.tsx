@@ -20,6 +20,7 @@ import PanZoomTool from "@/components/editor/PanZoomTool";
 import OverlayTool from "@/components/editor/OverlayTool";
 import Timeline from "@/components/editor/Timeline";
 import AuthGuard from "@/components/auth/AuthGuard";
+import { EditorProvider } from "@/contexts/EditorContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -79,7 +80,8 @@ const VideoEditor = () => {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-[hsl(var(--editor-bg))]">
+      <EditorProvider>
+        <div className="min-h-screen bg-[hsl(var(--editor-bg))]">
         {/* Header */}
         <div className="bg-[hsl(var(--editor-panel))] border-b border-border px-4 py-3">
           <div className="container mx-auto flex items-center justify-between">
@@ -201,6 +203,7 @@ const VideoEditor = () => {
           </div>
         </div>
       </div>
+      </EditorProvider>
     </AuthGuard>
   );
 };
