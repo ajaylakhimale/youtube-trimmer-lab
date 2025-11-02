@@ -75,27 +75,35 @@ const VideoCanvas = ({
   }, [isReady, youtubeId, startTime, duration]);
 
   useEffect(() => {
-    if (!playerRef.current) return;
+    if (!playerRef.current || !playerRef.current.playVideo) return;
 
-    if (isPlaying) {
-      playerRef.current.playVideo();
-    } else {
-      playerRef.current.pauseVideo();
+    try {
+      if (isPlaying) {
+        playerRef.current.playVideo();
+      } else {
+        playerRef.current.pauseVideo();
+      }
+    } catch (error) {
+      console.log('Player not ready yet');
     }
   }, [isPlaying]);
 
   useEffect(() => {
-    if (!playerRef.current) return;
+    if (!playerRef.current || !playerRef.current.getCurrentTime) return;
     
     const interval = setInterval(() => {
-      if (playerRef.current && playerRef.current.getCurrentTime) {
-        const time = playerRef.current.getCurrentTime();
-        if (time >= startTime + duration) {
-          playerRef.current.seekTo(startTime);
+      try {
+        if (playerRef.current && playerRef.current.getCurrentTime) {
+          const time = playerRef.current.getCurrentTime();
+          if (time >= startTime + duration) {
+            playerRef.current.seekTo(startTime);
+          }
+          if (onTimeUpdate) {
+            onTimeUpdate(time - startTime);
+          }
         }
-        if (onTimeUpdate) {
-          onTimeUpdate(time - startTime);
-        }
+      } catch (error) {
+        // Player not ready yet
       }
     }, 100);
 
