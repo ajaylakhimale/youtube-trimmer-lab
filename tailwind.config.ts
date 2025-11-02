@@ -57,6 +57,14 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        editor: {
+          bg: "hsl(var(--editor-bg))",
+          panel: "hsl(var(--editor-panel))",
+          hover: "hsl(var(--editor-hover))",
+        },
+        timeline: {
+          bg: "hsl(var(--timeline-bg))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
