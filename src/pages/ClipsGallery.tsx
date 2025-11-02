@@ -99,13 +99,13 @@ const ClipsGallery = () => {
               </Button>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
               {clips.map((clip) => (
                 <Card
                   key={clip.id}
                   className="bg-[hsl(var(--card))] border-border overflow-hidden group cursor-pointer hover:border-primary transition-smooth"
                 >
-                  <div className="relative aspect-video bg-[hsl(var(--editor-panel))]">
+                  <div className="relative aspect-[9/16] bg-[hsl(var(--editor-panel))]">
                     <img
                       src={clip.thumbnail_url || "/placeholder.svg"}
                       alt={`Clip ${clip.clip_number}`}
@@ -119,6 +119,9 @@ const ClipsGallery = () => {
                     </div>
                     <div className="absolute top-2 left-2 bg-primary/80 px-2 py-1 rounded text-xs font-semibold">
                       #{clip.clip_number}
+                    </div>
+                    <div className="absolute bottom-2 left-2 bg-black/80 px-2 py-1 rounded text-xs">
+                      Instagram Reels
                     </div>
                   </div>
                   <div className="p-4">

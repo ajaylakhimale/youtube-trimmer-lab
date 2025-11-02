@@ -1,56 +1,121 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-const VideoCanvas = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+interface VideoCanvasProps {
+  youtubeId?: string;
+  startTime?: number;
+  duration?: number;
+  isPlaying?: boolean;
+  currentTime?: number;
+  onTimeUpdate?: (time: number) => void;
+}
+
+const VideoCanvas = ({ 
+  youtubeId, 
+  startTime = 0, 
+  duration = 30,
+  isPlaying = false,
+  currentTime = 0,
+  onTimeUpdate 
+}: VideoCanvasProps) => {
+  const playerRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    // Load YouTube IFrame API
+    if (!(window as any).YT) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    // Set canvas size
-    canvas.width = 1920;
-    canvas.height = 1080;
-
-    // Draw placeholder background
-    ctx.fillStyle = "hsl(220, 25%, 10%)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw center grid pattern
-    ctx.strokeStyle = "hsl(220, 15%, 18%)";
-    ctx.lineWidth = 1;
-    const gridSize = 50;
-
-    for (let x = 0; x < canvas.width; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.stroke();
+      (window as any).onYouTubeIframeAPIReady = () => {
+        setIsReady(true);
+      };
+    } else {
+      setIsReady(true);
     }
-
-    for (let y = 0; y < canvas.height; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
-    }
-
-    // Draw "Video Preview" text
-    ctx.fillStyle = "hsl(210, 15%, 60%)";
-    ctx.font = "48px system-ui";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("Video Preview", canvas.width / 2, canvas.height / 2);
   }, []);
 
+  useEffect(() => {
+    if (!isReady || !youtubeId || !containerRef.current) return;
+
+    // Create player
+    playerRef.current = new (window as any).YT.Player(containerRef.current, {
+      height: '100%',
+      width: '100%',
+      videoId: youtubeId,
+      playerVars: {
+        start: startTime,
+        end: startTime + duration,
+        controls: 0,
+        modestbranding: 1,
+        rel: 0,
+      },
+      events: {
+        onReady: (event: any) => {
+          event.target.seekTo(startTime);
+        },
+        onStateChange: (event: any) => {
+          if (event.data === (window as any).YT.PlayerState.ENDED) {
+            event.target.seekTo(startTime);
+            if (isPlaying) {
+              event.target.playVideo();
+            }
+          }
+        },
+      },
+    });
+
+    return () => {
+      if (playerRef.current) {
+        playerRef.current.destroy();
+      }
+    };
+  }, [isReady, youtubeId, startTime, duration]);
+
+  useEffect(() => {
+    if (!playerRef.current) return;
+
+    if (isPlaying) {
+      playerRef.current.playVideo();
+    } else {
+      playerRef.current.pauseVideo();
+    }
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (!playerRef.current) return;
+    
+    const interval = setInterval(() => {
+      if (playerRef.current && playerRef.current.getCurrentTime) {
+        const time = playerRef.current.getCurrentTime();
+        if (time >= startTime + duration) {
+          playerRef.current.seekTo(startTime);
+        }
+        if (onTimeUpdate) {
+          onTimeUpdate(time - startTime);
+        }
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [startTime, duration, onTimeUpdate]);
+
+  if (!youtubeId) {
+    return (
+      <div className="relative w-full aspect-[9/16] bg-[hsl(var(--editor-bg))] rounded-lg overflow-hidden flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground text-lg">No video loaded</p>
+          <p className="text-muted-foreground text-sm mt-2">Select a clip to start editing</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="relative w-full aspect-video bg-[hsl(var(--editor-bg))] rounded-lg overflow-hidden">
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full object-contain"
-      />
+    <div className="relative w-full aspect-[9/16] bg-black rounded-lg overflow-hidden">
+      <div ref={containerRef} className="absolute inset-0" />
     </div>
   );
 };

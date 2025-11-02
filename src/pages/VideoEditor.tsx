@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { 
   Type, 
   Frame, 
@@ -20,11 +20,62 @@ import PanZoomTool from "@/components/editor/PanZoomTool";
 import OverlayTool from "@/components/editor/OverlayTool";
 import Timeline from "@/components/editor/Timeline";
 import AuthGuard from "@/components/auth/AuthGuard";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+interface ClipData {
+  id: string;
+  clip_number: number;
+  start_time: number;
+  duration: number;
+  video_id: string;
+  videos: {
+    youtube_id: string;
+    title: string;
+  };
+}
 
 const VideoEditor = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const clipId = searchParams.get("clipId");
+  
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [clipData, setClipData] = useState<ClipData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (clipId) {
+      loadClip();
+    } else {
+      setLoading(false);
+    }
+  }, [clipId]);
+
+  const loadClip = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('clips')
+        .select(`
+          *,
+          videos (
+            youtube_id,
+            title
+          )
+        `)
+        .eq('id', clipId)
+        .single();
+
+      if (error) throw error;
+      setClipData(data);
+    } catch (error) {
+      console.error('Error loading clip:', error);
+      toast.error("Failed to load clip");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <AuthGuard>
@@ -43,7 +94,9 @@ const VideoEditor = () => {
               </Button>
               <div>
                 <h1 className="text-lg font-semibold">Video Editor</h1>
-                <p className="text-xs text-muted-foreground">Clip 1 • 0:30</p>
+                <p className="text-xs text-muted-foreground">
+                  {clipData ? `${clipData.videos.title} • Clip ${clipData.clip_number}` : 'No clip selected'}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -103,8 +156,21 @@ const VideoEditor = () => {
 
             {/* Center - Canvas */}
             <div className="lg:col-span-9 space-y-4">
-              <Card className="bg-[hsl(var(--editor-panel))] border-border p-6">
-                <VideoCanvas />
+              <Card className="bg-[hsl(var(--editor-panel))] border-border p-6 flex justify-center">
+                {loading ? (
+                  <div className="flex items-center justify-center py-20">
+                    <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : (
+                  <VideoCanvas 
+                    youtubeId={clipData?.videos.youtube_id}
+                    startTime={clipData?.start_time || 0}
+                    duration={clipData?.duration || 30}
+                    isPlaying={isPlaying}
+                    currentTime={currentTime}
+                    onTimeUpdate={setCurrentTime}
+                  />
+                )}
               </Card>
 
               {/* Timeline */}
@@ -122,11 +188,11 @@ const VideoEditor = () => {
                     )}
                   </Button>
                   <span className="text-sm text-muted-foreground">
-                    {Math.floor(currentTime / 60)}:{(currentTime % 60).toString().padStart(2, '0')} / 0:30
+                    {Math.floor(currentTime / 60)}:{Math.floor(currentTime % 60).toString().padStart(2, '0')} / {clipData?.duration || 30}s
                   </span>
                 </div>
                 <Timeline
-                  duration={30}
+                  duration={clipData?.duration || 30}
                   currentTime={currentTime}
                   onTimeChange={setCurrentTime}
                 />
