@@ -1,1 +1,4 @@
 project_id = "fjxezinllkioekwmcncn"
+
+[functions.process-youtube-video]
+verify_jwt = true
