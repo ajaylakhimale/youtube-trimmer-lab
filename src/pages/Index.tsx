@@ -37,7 +37,7 @@ const Index = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!user) {
       toast.error("Please sign in to process videos");
       navigate("/auth");
@@ -55,13 +55,18 @@ const Index = () => {
     }
 
     setIsProcessing(true);
-    
+
     try {
       const { data, error } = await supabase.functions.invoke('process-youtube-video', {
         body: { youtubeUrl: videoUrl }
       });
 
       if (error) throw error;
+
+      // Store video ID in session storage
+      if (data.videoId) {
+        sessionStorage.setItem('currentVideoId', data.videoId);
+      }
 
       toast.success(data.message || "Video processed successfully!");
       navigate("/clips");
@@ -78,7 +83,7 @@ const Index = () => {
       {/* Animated background */}
       <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--background))] via-[hsl(var(--editor-panel))] to-[hsl(var(--background))]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(180_85%_55%_/_0.1),transparent_50%)]" />
-      
+
       {/* Header with auth */}
       <div className="relative z-10">
         <div className="container mx-auto px-4 py-4 flex justify-end">
@@ -108,7 +113,7 @@ const Index = () => {
             <Sparkles className="w-4 h-4 text-primary" />
             <span className="text-sm text-primary">AI-Powered Video Clipping</span>
           </div>
-          
+
           <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
             <span className="bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text text-transparent">
               Clip, Edit & Export
@@ -116,9 +121,9 @@ const Index = () => {
             <br />
             <span className="text-foreground">YouTube Videos</span>
           </h1>
-          
+
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Transform any YouTube video into perfectly sized 30-second clips. 
+            Transform any YouTube video into perfectly sized 30-second clips.
             Add text, frames, and effects with our professional editor.
           </p>
 
@@ -131,7 +136,7 @@ const Index = () => {
                 Automatically split videos into 30s clips
               </p>
             </Card>
-            
+
             <Card className="bg-[hsl(var(--card))] border-border p-6 hover:border-primary transition-smooth">
               <Sparkles className="w-8 h-8 text-primary mb-3 mx-auto" />
               <h3 className="font-semibold mb-2">Pro Editor</h3>
@@ -139,7 +144,7 @@ const Index = () => {
                 Add text, frames, pan & zoom effects
               </p>
             </Card>
-            
+
             <Card className="bg-[hsl(var(--card))] border-border p-6 hover:border-primary transition-smooth">
               <Zap className="w-8 h-8 text-primary mb-3 mx-auto" />
               <h3 className="font-semibold mb-2">Fast Export</h3>

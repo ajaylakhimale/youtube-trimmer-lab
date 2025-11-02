@@ -20,14 +20,23 @@ const ClipsGallery = () => {
   const navigate = useNavigate();
   const [clips, setClips] = useState<Clip[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadClips();
+    // Get current video ID from session storage
+    const videoId = sessionStorage.getItem('currentVideoId');
+    setCurrentVideoId(videoId);
+    loadClips(videoId);
+
+    // Clear video ID when component unmounts
+    return () => {
+      sessionStorage.removeItem('currentVideoId');
+    };
   }, []);
 
-  const loadClips = async () => {
+  const loadClips = async (videoId: string | null) => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('clips')
         .select(`
           *,
@@ -38,6 +47,17 @@ const ClipsGallery = () => {
         `)
         .order('created_at', { ascending: false });
 
+      // Filter by video ID if one is set in the session
+      if (videoId) {
+        query = query.eq('video_id', videoId);
+      } else {
+        // If no video ID in session, show no clips
+        setClips([]);
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
 
       setClips(data || []);
@@ -129,11 +149,10 @@ const ClipsGallery = () => {
                       <span className="text-sm text-muted-foreground">
                         Starts at {formatTime(clip.start_time)}
                       </span>
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        clip.status === 'ready' 
-                          ? 'bg-primary/20 text-primary' 
+                      <span className={`text-xs px-2 py-1 rounded ${clip.status === 'ready'
+                          ? 'bg-primary/20 text-primary'
                           : 'bg-muted text-muted-foreground'
-                      }`}>
+                        }`}>
                         {clip.status}
                       </span>
                     </div>
