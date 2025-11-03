@@ -11,6 +11,7 @@ export interface TextLayer {
   bold: boolean;
   italic: boolean;
   underline: boolean;
+  textCase?: 'uppercase' | 'lowercase' | 'none';
   startTime: number;
   endTime: number;
 }
@@ -47,13 +48,13 @@ interface EditorContextType {
   addTextLayer: (layer: Omit<TextLayer, "id">) => void;
   updateTextLayer: (id: string, updates: Partial<TextLayer>) => void;
   removeTextLayer: (id: string) => void;
-  
+
   frameSettings: FrameSettings;
   updateFrameSettings: (settings: Partial<FrameSettings>) => void;
-  
+
   panZoomSettings: PanZoomSettings;
   updatePanZoomSettings: (settings: Partial<PanZoomSettings>) => void;
-  
+
   overlayLayers: OverlayLayer[];
   addOverlayLayer: (layer: Omit<OverlayLayer, "id">) => void;
   updateOverlayLayer: (id: string, updates: Partial<OverlayLayer>) => void;
@@ -69,7 +70,7 @@ export const EditorProvider = ({ children }: { children: ReactNode }) => {
   const [textLayers, setTextLayers] = useState<TextLayer[]>([]);
   const [overlayLayers, setOverlayLayers] = useState<OverlayLayer[]>([]);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
-  
+
   const [frameSettings, setFrameSettings] = useState<FrameSettings>({
     borderWidth: 0,
     borderColor: "#36D1DC",

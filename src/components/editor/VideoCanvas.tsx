@@ -21,6 +21,7 @@ const VideoCanvas = ({
 }: VideoCanvasProps) => {
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const videoWrapperRef = useRef<HTMLDivElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
   const [draggedLayer, setDraggedLayer] = useState<string | null>(null);
@@ -59,6 +60,17 @@ const VideoCanvas = ({
     }
   }, []);
 
+  // Effect to update pan/zoom transformations
+  useEffect(() => {
+    if (!videoWrapperRef.current) return;
+    const transform = `
+      scale(${panZoomSettings.zoom})
+      rotate(${panZoomSettings.rotation}deg)
+      translate(${panZoomSettings.x}px, ${panZoomSettings.y}px)
+    `;
+    videoWrapperRef.current.style.transform = transform;
+  }, [panZoomSettings]);
+
   useEffect(() => {
     if (!isReady || !youtubeId || !containerRef.current) return;
 
@@ -75,6 +87,12 @@ const VideoCanvas = ({
         rel: 0,
         playsinline: 1,
         fs: 0, // Disable fullscreen button
+        showinfo: 0, // Hide video title and uploader info
+        iv_load_policy: 3, // Hide video annotations
+        origin: window.location.origin,
+        enablejsapi: 1,
+        disablekb: 1, // Disable keyboard controls
+        branding: 0 // Hide YouTube logo
       },
       events: {
         onReady: (event: any) => {
@@ -95,8 +113,10 @@ const VideoCanvas = ({
               iframe.style.objectFit = 'cover';
               iframe.style.transform = 'scale(1.01)'; // Slight scale to prevent hairline borders
 
-              // Make sure iframe doesn't block interactions with overlays
+              // Make sure iframe doesn't block interactions with overlays, but allow for export
               iframe.style.pointerEvents = 'none';
+              iframe.style.backfaceVisibility = 'hidden';
+              iframe.style.willChange = 'transform';
 
               // Additional styles for better preview
               iframe.style.backgroundColor = 'black';
@@ -148,8 +168,17 @@ const VideoCanvas = ({
     }
   }, [isPlaying]);
 
+  const handleTimeChange = (newTime: number) => {
+    if (onTimeUpdate) {
+      onTimeUpdate(newTime);
+    }
+    if (playerRef.current && playerRef.current.seekTo) {
+      playerRef.current.seekTo(newTime + startTime);
+    }
+  };
+
   useEffect(() => {
-    if (!playerRef.current || !playerRef.current.getCurrentTime) return;
+    if (!playerRef.current || !playerRef.current.getCurrentTime || !isPlaying) return;
 
     const interval = setInterval(() => {
       try {
@@ -159,7 +188,7 @@ const VideoCanvas = ({
             playerRef.current.seekTo(startTime);
           }
           if (onTimeUpdate) {
-            onTimeUpdate(time - startTime);
+            onTimeUpdate(Math.max(0, time - startTime));
           }
         }
       } catch (error) {
@@ -168,7 +197,36 @@ const VideoCanvas = ({
     }, 100);
 
     return () => clearInterval(interval);
-  }, [startTime, duration, onTimeUpdate]);
+  }, [startTime, duration, onTimeUpdate, isPlaying]);
+
+  // Separate effect to sync timeline even when paused
+  useEffect(() => {
+    if (!playerRef.current || !playerRef.current.getCurrentTime) return;
+
+    const syncInterval = setInterval(() => {
+      try {
+        if (playerRef.current && playerRef.current.getCurrentTime && onTimeUpdate) {
+          const time = playerRef.current.getCurrentTime();
+          const relativeTime = Math.max(0, time - startTime);
+          onTimeUpdate(relativeTime);
+        }
+      } catch (error) {
+        // Player not ready yet
+      }
+    }, 200);
+
+    return () => clearInterval(syncInterval);
+  }, [startTime, onTimeUpdate]);
+
+  useEffect(() => {
+    if (playerRef.current && playerRef.current.seekTo) {
+      const videoTime = currentTime + startTime;
+      const playerTime = playerRef.current.getCurrentTime();
+      if (Math.abs(videoTime - playerTime) > 0.5) {
+        playerRef.current.seekTo(videoTime);
+      }
+    }
+  }, [currentTime, startTime]);
 
   const handleLayerMouseDown = (
     e: React.MouseEvent,
@@ -299,33 +357,60 @@ const VideoCanvas = ({
       {/* Reel-sized container - everything inside will be exported */}
       <div
         ref={canvasContainerRef}
-        className="relative w-auto h-full max-h-full aspect-[9/16] bg-black rounded-lg overflow-hidden shadow-2xl border-2 border-primary/40"
-        style={{
-          transform: `scale(${panZoomSettings.zoom}) rotate(${panZoomSettings.rotation}deg) translate(${panZoomSettings.x}px, ${panZoomSettings.y}px)`,
-          transition: draggedLayer ? "none" : "transform 0.2s ease",
+        className="export-container relative w-auto h-full max-h-full aspect-[9/16] bg-black rounded-lg overflow-hidden shadow-2xl border-2 border-primary/40"
+        onClick={(e) => {
+          // Deselect when clicking on canvas background (not on layers)
+          if (e.target === e.currentTarget || e.target === containerRef.current) {
+            setSelectedLayerId(null);
+          }
         }}
       >
-        {/* YouTube Video */}
+        {/* YouTube Video Container */}
         <div
-          ref={containerRef}
+          ref={videoWrapperRef}
           className="absolute inset-0"
           style={{
-            borderRadius: `${frameSettings.borderRadius}px`,
-            boxShadow: frameSettings.shadow !== "none" ? getShadowStyle(frameSettings.shadow) : "none",
-            zIndex: 1,
+            transformOrigin: 'center center',
+            transition: 'transform 0.1s ease',
           }}
-        />
+        >
+          <div
+            ref={containerRef}
+            className="absolute inset-0"
+            style={{
+              borderRadius: `${frameSettings.borderRadius}px`,
+              boxShadow: frameSettings.shadow !== "none" ? getShadowStyle(frameSettings.shadow) : "none",
+              zIndex: 1,
+              overflow: 'hidden',
+            }}
+          />
+        </div>
 
         {/* Frame Border */}
         {frameSettings.borderWidth > 0 && (
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              border: `${frameSettings.borderWidth}px solid ${frameSettings.borderColor}`,
-              borderRadius: `${frameSettings.borderRadius}px`,
-              zIndex: 2,
-            }}
-          />
+          frameSettings.borderColor.startsWith('linear-gradient') ? (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                borderRadius: `${frameSettings.borderRadius}px`,
+                padding: `${frameSettings.borderWidth}px`,
+                background: frameSettings.borderColor,
+                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                WebkitMaskComposite: 'xor',
+                maskComposite: 'exclude',
+                zIndex: 2,
+              }}
+            />
+          ) : (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                border: `${frameSettings.borderWidth}px solid ${frameSettings.borderColor}`,
+                borderRadius: `${frameSettings.borderRadius}px`,
+                zIndex: 2,
+              }}
+            />
+          )
         )}
 
         {/* Overlay Layers */}
@@ -378,16 +463,13 @@ const VideoCanvas = ({
             style={{
               left: `${layer.x}%`,
               top: `${layer.y}%`,
-              fontSize: `${layer.fontSize}px`,
-              color: layer.color,
-              fontFamily: layer.fontFamily,
-              fontWeight: layer.bold ? "bold" : "normal",
-              fontStyle: layer.italic ? "italic" : "normal",
-              textDecoration: layer.underline ? "underline" : "none",
-              textShadow: "2px 2px 4px rgba(0,0,0,0.8)",
-              whiteSpace: "nowrap",
               zIndex: 10,
               pointerEvents: 'auto',
+              whiteSpace: "nowrap",
+              display: 'inline-block',
+              width: 'max-content',
+              maxWidth: '90%',
+              padding: '2px',
             }}
             onMouseDown={(e) => handleLayerMouseDown(e, layer.id, layer.x, layer.y)}
             onDoubleClick={() => handleTextDoubleClick(layer.id, layer.text)}
@@ -420,7 +502,30 @@ const VideoCanvas = ({
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
-              layer.text
+              <span
+                key={layer.color} // Force re-render on gradient change
+                style={{
+                  display: 'inline-block',
+                  fontSize: `${layer.fontSize}px`,
+                  ...(layer.color.startsWith('linear-gradient')
+                    ? {
+                      background: layer.color,
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text',
+                    }
+                    : { color: layer.color }
+                  ),
+                  fontFamily: layer.fontFamily,
+                  fontWeight: layer.bold ? "bold" : "normal",
+                  fontStyle: layer.italic ? "italic" : "normal",
+                  textDecoration: layer.underline ? "underline" : "none",
+                  textShadow: layer.color.startsWith('linear-gradient') ? "none" : "2px 2px 4px rgba(0,0,0,0.8)",
+                  textTransform: layer.textCase || 'none',
+                }}
+              >
+                {layer.text}
+              </span>
             )}
             {selectedLayerId === layer.id && (
               <button
@@ -449,7 +554,7 @@ function getShadowStyle(shadow: string): string {
     case "large":
       return "0 8px 32px rgba(0,0,0,0.5)";
     case "glow":
-      return "0 0 20px rgba(54, 209, 220, 0.6)";
+      return "0 0 20px rgba(54, 209, 220, 0.8), 0 0 40px rgba(54, 209, 220, 0.6), 0 0 60px rgba(54, 209, 220, 0.4)";
     default:
       return "none";
   }

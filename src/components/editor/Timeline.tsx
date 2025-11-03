@@ -12,7 +12,7 @@ const Timeline = ({ duration, currentTime, onTimeChange }: TimelineProps) => {
 
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!timelineRef.current) return;
-    
+
     const rect = timelineRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percentage = x / rect.width;
@@ -21,12 +21,12 @@ const Timeline = ({ duration, currentTime, onTimeChange }: TimelineProps) => {
   };
 
   const handleMouseDown = () => setIsDragging(true);
-  
+
   useEffect(() => {
     const handleMouseUp = () => setIsDragging(false);
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging || !timelineRef.current) return;
-      
+
       const rect = timelineRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const percentage = x / rect.width;

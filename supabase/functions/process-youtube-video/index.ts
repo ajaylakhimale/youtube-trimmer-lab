@@ -70,44 +70,58 @@ serve(async (req) => {
 
     console.log('Processing YouTube video:', youtubeId);
 
-    // Fetch video metadata from YouTube API (using oEmbed - no API key needed)
-    let videoData;
+    // Fetch video metadata using Google YouTube Data API v3
     let videoDuration = 0;
-    
+    let videoTitle = '';
+    let thumbnailUrl = '';
+
     try {
-      const oEmbedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${youtubeId}&format=json`;
-      const response = await fetch(oEmbedUrl);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch video metadata');
+      const YOUTUBE_API_KEY = 'AIzaSyBfUGxzLr7csZkHltt2kcDIjfbNIli_ljo';
+      const apiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${youtubeId}&key=${YOUTUBE_API_KEY}&part=snippet,contentDetails`;
+
+      console.log('Fetching video data from YouTube Data API...');
+      const apiResponse = await fetch(apiUrl);
+
+      if (!apiResponse.ok) {
+        throw new Error(`YouTube API returned status ${apiResponse.status}`);
       }
-      
-      videoData = await response.json();
+
+      const data = await apiResponse.json();
+
+      if (!data.items || data.items.length === 0) {
+        return new Response(
+          JSON.stringify({ error: 'Video not found or unavailable' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const videoInfo = data.items[0];
+      videoTitle = videoInfo.snippet?.title || 'Untitled Video';
+      thumbnailUrl = videoInfo.snippet?.thumbnails?.maxres?.url ||
+        videoInfo.snippet?.thumbnails?.high?.url ||
+        `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`;
+
+      // Parse ISO 8601 duration (e.g., "PT1H2M30S" = 1 hour, 2 minutes, 30 seconds)
+      const duration = videoInfo.contentDetails?.duration || '';
+      const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+
+      if (match) {
+        const hours = parseInt(match[1] || '0', 10);
+        const minutes = parseInt(match[2] || '0', 10);
+        const seconds = parseInt(match[3] || '0', 10);
+        videoDuration = hours * 3600 + minutes * 60 + seconds;
+        console.log('Successfully fetched video metadata:', {
+          title: videoTitle,
+          duration: videoDuration,
+          formatted: `${hours}h ${minutes}m ${seconds}s`
+        });
+      } else {
+        throw new Error('Could not parse video duration');
+      }
     } catch (error) {
-      console.error('Error fetching video metadata:', error);
+      console.error('Error fetching video data from YouTube API:', error);
       return new Response(
         JSON.stringify({ error: 'Failed to fetch video information from YouTube' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Fetch actual video duration from YouTube page metadata
-    try {
-      const pageResponse = await fetch(`https://www.youtube.com/watch?v=${youtubeId}`);
-      const pageHtml = await pageResponse.text();
-      
-      // Extract duration from ytInitialPlayerResponse JSON in page
-      const match = pageHtml.match(/"lengthSeconds":"(\d+)"/);
-      if (match && match[1]) {
-        videoDuration = parseInt(match[1], 10);
-        console.log('Extracted video duration:', videoDuration, 'seconds');
-      } else {
-        throw new Error('Could not extract duration from page');
-      }
-    } catch (error) {
-      console.error('Error fetching video duration:', error);
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch video duration from YouTube' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -118,7 +132,7 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    
+
     // Create video record in database
     const { data: video, error: videoError } = await supabase
       .from('videos')
@@ -126,9 +140,9 @@ serve(async (req) => {
         user_id: user.id,
         youtube_url: youtubeUrl,
         youtube_id: youtubeId,
-        title: videoData.title,
+        title: videoTitle,
         duration: videoDuration,
-        thumbnail_url: videoData.thumbnail_url || `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`,
+        thumbnail_url: thumbnailUrl,
         status: 'processing',
       })
       .select()
@@ -146,25 +160,45 @@ serve(async (req) => {
 
     // Generate 30-second clips metadata based on actual video duration
     const clipDuration = 30;
-    const numClips = Math.floor(videoDuration / clipDuration);
-    
+    const maxClips = 20;
+    const maxDuration = 7200; // 2 hours in seconds
+
+    if (videoDuration > maxDuration) {
+      return new Response(
+        JSON.stringify({ error: `Video is longer than 2 hours. Please select a shorter video.` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const numClips = Math.min(maxClips, Math.floor(videoDuration / clipDuration));
     console.log(`Generating ${numClips} clips from ${videoDuration}s video`);
-    
+
+    // Optimized algorithm: Divide video into segments and randomly pick from each
     const clips = [];
-    for (let i = 0; i < numClips; i++) {
-      const startTime = i * clipDuration;
-      const endTime = Math.min(startTime + clipDuration, videoDuration);
-      
-      clips.push({
-        video_id: video.id,
-        clip_number: i + 1,
-        start_time: startTime,
-        end_time: endTime,
-        duration: clipDuration,
-        // For demo, use YouTube thumbnail with time parameter
-        thumbnail_url: `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`,
-        status: 'ready', // In production, this would be 'pending' until actually processed
-      });
+
+    if (numClips > 0) {
+      const segmentSize = Math.floor(videoDuration / numClips);
+
+      for (let i = 0; i < numClips; i++) {
+        const segmentStart = i * segmentSize;
+        const segmentEnd = Math.min((i + 1) * segmentSize, videoDuration - clipDuration);
+
+        // Pick a random start time within this segment
+        const startTime = segmentStart + Math.floor(Math.random() * Math.max(1, segmentEnd - segmentStart));
+        const endTime = Math.min(startTime + clipDuration, videoDuration);
+
+        clips.push({
+          video_id: video.id,
+          clip_number: i + 1,
+          start_time: startTime,
+          end_time: endTime,
+          duration: endTime - startTime,
+          thumbnail_url: `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`,
+          status: 'ready',
+        });
+      }
+
+      console.log(`Generated ${clips.length} clips successfully`);
     }
 
     // Insert clips
@@ -179,7 +213,7 @@ serve(async (req) => {
         .from('videos')
         .update({ status: 'failed', error_message: 'Failed to generate clips' })
         .eq('id', video.id);
-      
+
       return new Response(
         JSON.stringify({ error: 'Failed to generate clips' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

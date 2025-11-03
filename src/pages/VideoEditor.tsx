@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import html2canvas from 'html2canvas';
 import {
   Type,
   Frame,
@@ -45,6 +46,9 @@ const VideoEditor = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [clipData, setClipData] = useState<ClipData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const exportToastId = 'export-progress';
 
   useEffect(() => {
     if (clipId) {
@@ -78,6 +82,120 @@ const VideoEditor = () => {
     }
   };
 
+  const handleTimeChange = (newTime: number) => {
+    setCurrentTime(newTime);
+  };
+
+  const handleExport = async () => {
+    if (!clipData || isExporting) return;
+    
+    try {
+      setIsExporting(true);
+      setExportProgress(0);
+      toast.loading("Preparing video for export...", { id: exportToastId });
+
+      // Reset playback to start
+      setCurrentTime(0);
+      setIsPlaying(false);
+      
+      // Small delay to ensure video is reset
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const container = document.querySelector(".export-container") as HTMLElement;
+      if (!container) {
+        throw new Error("Could not find video container");
+      }
+
+      // Create a temporary canvas element
+      const tempCanvas = document.createElement('canvas');
+      const ctx = tempCanvas.getContext('2d');
+      
+      // Set canvas size to match container size
+      const rect = container.getBoundingClientRect();
+      tempCanvas.width = rect.width;
+      tempCanvas.height = rect.height;
+
+      // Function to capture a frame
+      const captureFrame = async () => {
+        const canvas = await html2canvas(container, {
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: null,
+          scale: 2, // Higher quality
+          logging: false
+        });
+        ctx?.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+      };
+
+      // Create a MediaRecorder from the canvas stream
+      const stream = tempCanvas.captureStream(30); // 30 FPS
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: "video/webm;codecs=vp9",
+        videoBitsPerSecond: 8000000 // 8 Mbps for high quality
+      });
+
+      const chunks: Blob[] = [];
+      const startTime = Date.now();
+      const duration = clipData.duration * 1000; // Convert to milliseconds
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data);
+        }
+      };
+
+      // Update progress and capture frames
+      const frameInterval = 1000 / 30; // 30 FPS
+      const captureInterval = setInterval(async () => {
+        await captureFrame();
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min((elapsed / duration) * 100, 99.9);
+        setExportProgress(progress);
+        toast.loading(`Exporting video: ${Math.round(progress)}%`, { id: exportToastId });
+      }, frameInterval);
+
+      mediaRecorder.onstop = () => {
+        clearInterval(captureInterval);
+        const blob = new Blob(chunks, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `clip-${clipData.clip_number}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setExportProgress(100);
+        toast.success("Video exported successfully!", { id: exportToastId });
+        setIsExporting(false);
+      };
+
+      // Start recording
+      setIsPlaying(true);
+      mediaRecorder.start(1000); // Capture in 1-second chunks for smoother progress
+
+      // Stop recording after the duration
+      setTimeout(() => {
+        clearInterval(captureInterval);
+        setIsPlaying(false);
+        mediaRecorder.stop();
+      }, duration);
+
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("Failed to export video. Please try again.", { id: exportToastId });
+      setIsExporting(false);
+      setExportProgress(0);
+      setIsPlaying(false);
+    } finally {
+      // Ensure we clean up even if there's an error
+      const videoElement = document.querySelector('.export-container iframe') as HTMLIFrameElement;
+      if (videoElement) {
+        videoElement.style.opacity = '1';
+      }
+    }
+  };
+
   return (
     <AuthGuard>
       <EditorProvider>
@@ -102,12 +220,29 @@ const VideoEditor = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm">
-                  Save Draft
-                </Button>
-                <Button className="gradient-primary" size="sm">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
+                <Button 
+                  className="gradient-primary relative" 
+                  size="sm"
+                  onClick={handleExport}
+                  disabled={!clipData || isExporting}
+                >
+                  {isExporting ? (
+                    <>
+                      <div className="flex items-center">
+                        <div className="w-4 h-4 mr-2 border-2 border-t-transparent border-white rounded-full animate-spin" />
+                        Exporting {Math.round(exportProgress)}%
+                      </div>
+                      <div 
+                        className="absolute bottom-0 left-0 h-1 bg-white/30 transition-all duration-300 rounded-full" 
+                        style={{ width: `${exportProgress}%` }} 
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 mr-2" />
+                      Export Video
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -198,7 +333,7 @@ const VideoEditor = () => {
                   <Timeline
                     duration={clipData?.duration || 30}
                     currentTime={currentTime}
-                    onTimeChange={setCurrentTime}
+                    onTimeChange={handleTimeChange}
                   />
                 </Card>
               </div>

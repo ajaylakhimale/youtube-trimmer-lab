@@ -2,38 +2,36 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { ZoomIn, ZoomOut, Maximize } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useEditor } from "@/contexts/EditorContext";
 import { toast } from "sonner";
 
 const PanZoomTool = () => {
   const { panZoomSettings, updatePanZoomSettings } = useEditor();
-  
+
   const [zoom, setZoom] = useState([panZoomSettings.zoom * 100]);
   const [rotation, setRotation] = useState([panZoomSettings.rotation]);
   const [x, setX] = useState([panZoomSettings.x]);
   const [y, setY] = useState([panZoomSettings.y]);
 
-  const applySettings = () => {
+  // Live update pan/zoom settings
+  useEffect(() => {
     updatePanZoomSettings({
       zoom: zoom[0] / 100,
       rotation: rotation[0],
       x: x[0],
       y: y[0],
     });
-    toast.success("Pan/Zoom applied!");
-  };
+  }, [zoom, rotation, x, y]);
 
   const handleZoomIn = () => {
     const newZoom = Math.min(200, zoom[0] + 10);
     setZoom([newZoom]);
-    updatePanZoomSettings({ zoom: newZoom / 100 });
   };
 
   const handleZoomOut = () => {
     const newZoom = Math.max(50, zoom[0] - 10);
     setZoom([newZoom]);
-    updatePanZoomSettings({ zoom: newZoom / 100 });
   };
 
   const handleReset = () => {
@@ -41,7 +39,6 @@ const PanZoomTool = () => {
     setRotation([0]);
     setX([0]);
     setY([0]);
-    updatePanZoomSettings({ zoom: 1, rotation: 0, x: 0, y: 0 });
     toast.success("Reset to default!");
   };
 
@@ -127,13 +124,9 @@ const PanZoomTool = () => {
           <span className="text-xs text-muted-foreground">{y}px</span>
         </div>
 
-        <Button 
-          className="w-full gradient-primary" 
-          size="sm"
-          onClick={applySettings}
-        >
-          Apply Pan/Zoom
-        </Button>
+        <p className="text-xs text-center text-muted-foreground pt-2">
+          Changes apply instantly
+        </p>
       </div>
     </div>
   );
